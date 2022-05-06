@@ -1,75 +1,90 @@
-{% extends 'base/layout.html' %}
+{% extends "base/layout.html" %}
 {% load buttons %}
 {% load render_table from django_tables2 %}
 {% load static %}
 {% load perms %}
 {% load helpers %}
-
-{% block title %}Topology Views{% endblock %}
-
+{% block title %}
+    Topology Views
+{% endblock title %}
 {% block head %}
-<link rel="stylesheet" href="{% static 'netbox_topology_views/css/vendor.css' %}">
-<link rel="stylesheet" href="{% static 'netbox_topology_views/css/app.css' %}">
-{% endblock %} 
-
+    <link rel="stylesheet"
+          href="{% static 'netbox_topology_views/css/vendor.css' %}"/>
+    <link rel="stylesheet"
+          href="{% static 'netbox_topology_views/css/app.css' %}"/>
+{% endblock head %}
 {% block controls %}
-  <div class="controls">
-    	<div class="control-group">
-			{% block extra_controls %}{% endblock %}
-			<a id="btnDownloadImage" class="btn btn-sm btn-info">
-				<i class="mdi mdi-download"></i>
-				Download
-			</a>
-    	</div>
-	</div>
-{% endblock controls %}
-
-{% block tabs %}
-	<ul class="nav nav-tabs px-3">
-    	{% block tab_items %}
-		<li class="nav-item" role="presentation">
-			<button class="nav-link active" id="network-tab" data-bs-toggle="tab" data-bs-target="#networks" type="button" role="tab" aria-controls="filters-form" aria-selected="true">
-			  Network
-			</button>
-		</li>
-		{% if filter_form %}
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="filters-form-tab" data-bs-toggle="tab" data-bs-target="#filters-form" type="button" role="tab" aria-controls="object-list" aria-selected="false">
-            Filters
-            {% if filter_form %}{% badge filter_form.changed_data|length bg_color="blue" %}{% endif %}
-          </button>
-        </li>
-      	{% endif %}
-		{% endblock tab_items %}
-	</ul>
-{% endblock tabs %}
-
-{% block content-wrapper %}
-  {% with config=settings.PLUGINS_CONFIG.netbox_topology_views %}
-    <div class="tab-content">
-
-      <div class="tab-pane show active" id="networks" role="tabpanel" aria-labelledby="network-tab">
-        <div class="panel-body">
-          <div id="visgraph" class=""></div>
+    <div class="controls">
+        <div class="control-group">
+            {% block extra_controls %}
+            {% endblock extra_controls %}
+            <a id="btnDownloadImage" class="btn btn-sm btn-info">
+                <i class="mdi mdi-download"></i>
+                Download
+            </a>
         </div>
-
-        <script type="text/javascript">
-          var topology_data = {{ topology_data | safe }};
-        </script>
-      </div>
-
-      {% if filter_form %}
-      <div class="tab-pane show" id="filters-form" role="tabpanel" aria-labelledby="filters-form-tab">
-        {% include 'inc/filter_list.html' %}
-      </div>
-      {% endif %}
-
     </div>
-  {% endwith %}
+{% endblock controls %}
+{% block tabs %}
+    <ul class="nav nav-tabs px-3">
+        {% block tab_items %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active"
+                        id="network-tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#networks"
+                        type="button"
+                        role="tab"
+                        aria-controls="filters-form"
+                        aria-selected="true">
+                    Network
+                </button>
+            </li>
+            {% if filter_form %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link"
+                            id="filters-form-tab"
+                            data-bs-toggle="tab"
+                            data-bs-target="#filters-form"
+                            type="button"
+                            role="tab"
+                            aria-controls="object-list"
+                            aria-selected="false">
+                        Filters
+                        {% if filter_form %}
+                            {% badge filter_form.changed_data|length bg_color="blue" %}
+                        {% endif %}
+                    </button>
+                </li>
+            {% endif %}
+        {% endblock tab_items %}
+    </ul>
+{% endblock tabs %}
+{% block content-wrapper %}
+    {% with config=settings.PLUGINS_CONFIG.netbox_topology_views %}
+        <div class="tab-content">
+            <div class="tab-pane show active"
+                 id="networks"
+                 role="tabpanel"
+                 aria-labelledby="network-tab">
+                <div class="panel-body">
+                    <div id="visgraph"></div>
+                </div>
+                <script type="text/javascript">var topology_data = {{ topology_data | safe }};</script>
+            </div>
+            {% if filter_form %}
+                <div class="tab-pane show"
+                     id="filters-form"
+                     role="tabpanel"
+                     aria-labelledby="filters-form-tab">
+                    {% include 'inc/filter_list.html' %}
+                </div>
+            {% endif %}
+        </div>
+    {% endwith %}
 {% endblock content-wrapper %}
-
 {% block javascript %}
-  <script src="{% static 'netbox_topology_views/js/vendor.js' %}"></script>
-	<script src="{% static 'netbox_topology_views/js/app.js' %}"></script>
-	<script type="application/javascript">iniPlotboxIndex()</script>
+    <script src="{% static 'netbox_topology_views/js/vendor.js' %}"></script>
+    <script src="{% static 'netbox_topology_views/js/app.js' %}"></script>
+    <script type="application/javascript">iniPlotboxIndex()</script>
 {% endblock javascript %}
