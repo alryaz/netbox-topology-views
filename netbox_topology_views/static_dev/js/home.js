@@ -85,17 +85,11 @@ function iniPlotboxIndex() {
 function handleLoadData() {
     if (topology_data !== null) {
         
-        if (htmlElement.dataset.netboxColorMode == "dark") {
+        if (htmlElement.dataset.netboxColorMode === "dark") {
             options.nodes.font.color = "#fff";
         }
 
-        graph = null;
-        nodes = new vis.DataSet();
-        edges = new vis.DataSet();
-        graph = new vis.Network(container, { nodes: nodes, edges: edges }, options);
-        
-        topology_data.edges.forEach(addEdge);
-        topology_data.nodes.forEach(addNode);
+        graph = new vis.Network(container, { nodes: topology_data.nodes, edges: topology_data.edges }, options);
 
         graph.fit();
         canvas = document.getElementById('visgraph').getElementsByTagName('canvas')[0];

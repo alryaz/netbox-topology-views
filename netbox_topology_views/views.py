@@ -1,6 +1,10 @@
 import json
+from typing import Optional, Collection, Iterable, Container, List, Dict, Mapping, Any
+
+from django.utils.html import escape
 
 from dcim.models import Device, Cable, DeviceRole
+from circuits.models import CircuitTermination
 from django.conf import settings
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Q
@@ -14,7 +18,149 @@ from .filters import DeviceFilterSet
 from .forms import DeviceFilterForm
 
 
-def get_topology_data(queryset, hide_unconnected):
+def _generate_description(title: str, from_data: Mapping[str, Any]) -> str:
+    title_tag = f'<span class="topology-item-description">{escape(title)}</span>'
+    table_tag = (
+        '<table class="topology-item-table"><tr>'
+        + "</tr><tr>".join(
+            f'<th align="right">{title}</th><td>{escape(content)}</td>'
+            for title, content in from_data.items()
+        )
+        + "</tr></table>"
+    )
+
+    return title_tag + table_tag
+
+
+def get_topology_data(
+    queryset: Iterable[Device],
+    hide_unconnected: bool = False,
+    ignore_cable_types: Collection[str] = (),
+    enable_circuit_terminations: Optional[bool] = None,
+    enabled_device_images: Optional[Collection[str]] = None,
+) -> Optional[Dict]:
+    if not queryset:
+        return None
+
+    # Load plugin configuration
+    plugin_config = settings.PLUGINS_CONFIG["netbox_topology_views"]
+
+    if ignore_cable_types is None:
+        ignore_cable_types: Collection[str] = plugin_config["ignore_cable_type"]
+
+    if enable_circuit_terminations is None:
+        enable_circuit_terminations: bool = plugin_config["enable_circuit_terminations"]
+
+    if enabled_device_images is None:
+        enabled_device_images: Container[str] = plugin_config["device_img"]
+
+    nodes, edges = [], []
+
+    device_ids = frozenset(d.id for d in queryset)
+    devices_with_cables = set()
+
+    # Fetch cables for all IDs
+    cables_query = [
+        Q(_termination_a_device_id__in=device_ids) | Q(_termination_b_device_id__in=device_ids),
+    ]
+
+    # Shave off circuit terminations, if not enabled
+    if not enable_circuit_terminations:
+        cables_query.append(
+            ~(
+                Q(termination_a_type__model="circuittermination")
+                | Q(termination_b_type__model="circuittermination")
+            )
+        )
+
+    # Shave off cable types, if provided
+    if ignore_cable_types:
+        cables_query.append(
+            ~(
+                Q(termination_a_type__name__in=ignore_cable_types)
+                | Q(termination_b_type__name__in=ignore_cable_types)
+            )
+        )
+
+    # Iterate over cables, add edges
+    for cable in Cable.objects.filter(*cables_query):
+        if (
+            cable.termination_a_type in ignore_cable_types
+            or cable.termination_b_type in ignore_cable_types
+        ):
+            continue
+
+        t_a, t_b = cable.termination_a, cable.termination_b
+
+        if isinstance(t_a, CircuitTermination) or isinstance(t_b, CircuitTermination):
+            # @TODO: finish circuit termination processing
+            continue
+
+        devices_with_cables.update((t_a.device.id, t_b.device.id))
+        edge = {
+            "id": len(edges),
+            "from": t_a.device.id,
+            "to": t_b.device.id,
+            "title": f"Cable between:<br>{t_a.device} [{t_a}]<br>{t_b.device} [{t_b}]",
+            "headlabel": str(t_a),
+            "taillabel": str(t_b),
+        }
+
+        if cable.type:
+            edge["label"] = cable.type
+            edge["font"] = {"align": "middle"}
+
+        if cable.color != "":
+            edge["color"] = f"#{cable.color}"
+
+        edges.append(edge)
+
+    # Iterate over nodes
+    for device in queryset:
+        device_id = device.id
+        if hide_unconnected and device_id not in devices_with_cables:
+            continue
+
+        role_image_slug = (
+            device.device_role.slug
+            if device.device_role.slug in enabled_device_images
+            else "role-unknown"
+        )
+
+        device_label = str(device)
+
+        node = {
+            "id": device.id,
+            "name": escape(
+                device.name if device.name is None else f"untitled-{device.identifier}"
+            ),
+            "label": escape(device_label),
+            "shape": "image",
+            "image": f"../../static/netbox_topology_views/img/{role_image_slug}.png",
+        }
+
+        node_data = {"Status": device.status}
+
+        if device.device_type:
+            node_data["Type"] = device.device_type.model
+        if device.device_role.name:
+            node_data["Role"] = device.device_role.name
+        if device.serial:
+            node_data["Serial"] = repr(device.serial)
+        if device.primary_ip:
+            node_data["Primary IP"] = device.primary_ip
+
+        node["title"] = _generate_description(device_label, node_data)
+
+        if device.device_role.color != "":
+            node["color.border"] = "#" + device.device_role.color
+
+        nodes.append(node)
+
+    return {"nodes": nodes, "edges": edges}
+
+
+def get_topology_data_old(queryset, hide_unconnected):
     nodes = []
     nodes_ids = []
     edges = []
